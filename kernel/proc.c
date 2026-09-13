@@ -4,6 +4,7 @@
 #include "riscv.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "proc_info.h"
 #include "defs.h"
 
 struct cpu cpus[NCPU];
@@ -124,6 +125,8 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  p->cpu_ticks = 0;
+  p->num_sched = 0;
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -167,6 +170,8 @@ freeproc(struct proc *p)
   p->chan = 0;
   p->killed = 0;
   p->xstate = 0;
+  p->cpu_ticks = 0;
+  p->num_sched = 0;
   p->state = UNUSED;
 }
 
@@ -450,6 +455,7 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        p->num_sched++;
         swtch(&c->context, &p->context);
 
         // Don't re-enable interrupts on release.
@@ -699,3 +705,58 @@ procdump(void)
     printk("\n");
   }
 }
+
+// Retrieve process table information for all active processes.
+// Copies array of struct proc_info to user address dst_addr.
+// Returns number of processes retrieved, or -1 on error.
+int
+proc_getpinfo(uint64 dst_addr, int max_procs)
+{
+  struct proc *p;
+  struct proc_info info;
+  int count = 0;
+  static char *states[] = {
+    // clang-format off
+    [UNUSED]    = "UNUSED",
+    [USED]      = "USED",
+    [SLEEPING]  = "SLEEPING",
+    [RUNNABLE]  = "RUNNABLE",
+    [RUNNING]   = "RUNNING",
+    [ZOMBIE]    = "ZOMBIE"
+    // clang-format on
+  };
+
+  if (max_procs <= 0 || dst_addr == 0)
+    return -1;
+
+  for (p = proc; p < &proc[NPROC] && count < max_procs; p++) {
+    acquire(&wait_lock);
+    acquire(&p->lock);
+    if (p->state != UNUSED) {
+      memset(&info, 0, sizeof(info));
+      info.pid = p->pid;
+      info.ppid = p->parent ? p->parent->pid : 0;
+      if (p->state >= 0 && p->state < NELEM(states) && states[p->state])
+        safestrcpy(info.state, states[p->state], sizeof(info.state));
+      else
+        safestrcpy(info.state, "UNKNOWN", sizeof(info.state));
+      info.sz = p->sz;
+      safestrcpy(info.name, p->name, sizeof(info.name));
+      info.cpu_ticks = p->cpu_ticks;
+      info.num_sched = p->num_sched;
+      release(&p->lock);
+      release(&wait_lock);
+
+      uint64 target = dst_addr + (uint64)count * sizeof(struct proc_info);
+      if (copyout(myproc()->pagetable, myproc()->sz, target, (char *)&info, sizeof(info)) < 0)
+        return -1;
+      count++;
+    } else {
+      release(&p->lock);
+      release(&wait_lock);
+    }
+  }
+
+  return count;
+}
+
