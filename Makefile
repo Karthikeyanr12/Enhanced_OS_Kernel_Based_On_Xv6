@@ -157,6 +157,8 @@ UPROGS=\
 	$U/_schedtest\
 	$U/_mlfqpriority\
 	$U/_mlfqstarvation\
+	$U/_trace\
+	$U/_tracetest\
 
 
 fs.img: mkfs/mkfs README $(UPROGS)

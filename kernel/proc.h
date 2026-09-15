@@ -111,5 +111,6 @@ struct proc {
   uint num_sched;              // Number of times scheduled
   int priority;                // Current MLFQ queue level (0, 1, 2)
   int ticks_in_slice;          // Timer ticks consumed in current slice
+  int trace_mask;              // System call tracing bitmask
 };
 

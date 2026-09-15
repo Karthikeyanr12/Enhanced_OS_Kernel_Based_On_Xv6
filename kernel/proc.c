@@ -131,6 +131,7 @@ found:
   p->num_sched = 0;
   p->priority = MLFQ_PRIO_HIGH;
   p->ticks_in_slice = 0;
+  p->trace_mask = 0;
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -299,6 +300,7 @@ kfork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+  np->trace_mask = p->trace_mask;
 
   pid = np->pid;
 
