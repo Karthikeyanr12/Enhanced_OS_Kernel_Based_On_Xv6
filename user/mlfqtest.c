@@ -16,67 +16,122 @@ get_proc_prio(int pid)
   return -1;
 }
 
+static uint64
+get_proc_ticks(int pid)
+{
+  int n = getpinfo(pinfo, 64);
+  for (int i = 0; i < n; i++) {
+    if (pinfo[i].pid == pid)
+      return pinfo[i].cpu_ticks;
+  }
+  return 0;
+}
+
+static uint
+get_proc_sched(int pid)
+{
+  int n = getpinfo(pinfo, 64);
+  for (int i = 0; i < n; i++) {
+    if (pinfo[i].pid == pid)
+      return pinfo[i].num_sched;
+  }
+  return 0;
+}
+
+// Deterministic compute workload: polynomial arithmetic
+static void
+do_compute_workload(int iterations)
+{
+  volatile uint64 sum = 0;
+  for (int i = 0; i < iterations; i++) {
+    sum += (uint64)i * (uint64)(i ^ 0x5a5a);
+  }
+}
+
 int
 main(int argc, char *argv[])
 {
-  printf("mlfqtest: starting MLFQ validation tests...\n");
+  printf("=== MLFQ Test 1: Basic MLFQ Scheduling Test ===\n");
 
-  // Test 1: Check initial process priority is Q0 (0)
+  // Part 1: Initial priority check
   int my_prio = get_proc_prio(getpid());
-  printf("mlfqtest: initial process priority is Q%d\n", my_prio);
+  printf("mlfqtest: checking initial priority: Q%d\n", my_prio);
   if (my_prio != 0) {
-    printf("mlfqtest: FAIL - initial priority should be 0\n");
+    printf("mlfqtest: FAIL - initial priority is %d, expected 0 (Q0)\n", my_prio);
     exit(1);
   }
+  printf("mlfqtest: PASS - initial priority is Q0\n");
 
-  // Test 2: CPU-bound process should demote to Q1 and Q2
-  printf("mlfqtest: testing CPU-bound process demotion...\n");
+  // Part 2: Concurrent multi-process scheduling
+  printf("mlfqtest: spawning 3 concurrent compute workers...\n");
+  int pids[3];
+  for (int i = 0; i < 3; i++) {
+    int pid = fork();
+    if (pid < 0) {
+      printf("mlfqtest: fork failed\n");
+      exit(1);
+    }
+    if (pid == 0) {
+      // Child performs compute workload
+      do_compute_workload(80000000);
+      exit(0);
+    }
+    pids[i] = pid;
+  }
+
+  // Parent monitors workers
+  pause(5);
+  printf("mlfqtest: sampling active worker statistics:\n");
+  for (int i = 0; i < 3; i++) {
+    printf("  Worker %d (PID %d): prio=Q%d, ticks=%ld, sched=%d\n",
+           i, pids[i], get_proc_prio(pids[i]), get_proc_ticks(pids[i]), get_proc_sched(pids[i]));
+  }
+
+  // Wait for all 3 workers
+  for (int i = 0; i < 3; i++) {
+    wait(0);
+  }
+  printf("mlfqtest: all 3 concurrent workers completed.\n");
+
+  // Part 3: CPU-bound demotion verification
+  printf("mlfqtest: verifying CPU-bound process demotes to Q1 and Q2...\n");
   int cpid = fork();
   if (cpid < 0) {
     printf("mlfqtest: fork failed\n");
     exit(1);
   }
-
   if (cpid == 0) {
-    // Child: do heavy computation
-    volatile uint64 count = 0;
-    while (count < 2000000000ULL) {
-      count++;
-    }
+    do_compute_workload(120000000);
     exit(0);
   }
 
-  // Parent monitors child priority
   int reached_q1 = 0;
   int reached_q2 = 0;
-  for (int s = 0; s < 30; s++) {
+  for (int s = 0; s < 25; s++) {
     pause(1);
     int p = get_proc_prio(cpid);
     if (p == 1) reached_q1 = 1;
     if (p == 2) reached_q2 = 1;
     if (reached_q2) break;
   }
+  wait(0);
 
-  printf("mlfqtest: reached Q1=%d, reached Q2=%d\n", reached_q1, reached_q2);
+  printf("mlfqtest: demotion results: reached Q1=%d, reached Q2=%d\n", reached_q1, reached_q2);
   if (!reached_q2) {
     printf("mlfqtest: FAIL - compute process did not demote to Q2\n");
-    kill(cpid);
-    wait(0);
     exit(1);
   }
+  printf("mlfqtest: PASS - CPU demotion to Q2 verified\n");
 
-  // Test 3: I/O-bound process should retain high priority (Q0/Q1)
-  printf("mlfqtest: testing I/O-bound process priority retention...\n");
+  // Part 4: I/O-bound / sleeping priority retention
+  printf("mlfqtest: verifying I/O process retains high priority...\n");
   int iopid = fork();
   if (iopid < 0) {
     printf("mlfqtest: fork failed\n");
-    kill(cpid);
-    wait(0);
     exit(1);
   }
-
   if (iopid == 0) {
-    for (int i = 0; i < 20; i++) {
+    for (int i = 0; i < 15; i++) {
       pause(1);
     }
     exit(0);
@@ -90,21 +145,15 @@ main(int argc, char *argv[])
       io_stayed_high = 0;
     }
   }
+  wait(0);
 
-  printf("mlfqtest: I/O process stayed at high priority=%d\n", io_stayed_high);
+  printf("mlfqtest: I/O priority retention: stayed high=%d\n", io_stayed_high);
   if (!io_stayed_high) {
-    printf("mlfqtest: FAIL - I/O process dropped to low priority\n");
-    kill(cpid);
-    kill(iopid);
-    wait(0);
-    wait(0);
+    printf("mlfqtest: FAIL - I/O process dropped to lowest priority\n");
     exit(1);
   }
+  printf("mlfqtest: PASS - I/O priority retention verified\n");
 
-  kill(cpid);
-  wait(0);
-  wait(0);
-
-  printf("mlfqtest: ALL MLFQ TESTS PASSED!\n");
+  printf("=== MLFQ Test 1: ALL TESTS PASSED ===\n");
   exit(0);
 }

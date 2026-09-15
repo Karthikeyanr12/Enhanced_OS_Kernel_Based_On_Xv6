@@ -152,6 +152,11 @@ UPROGS=\
 	$U/_sync\
 	$U/_ps\
 	$U/_mlfqtest\
+	$U/_mlfqcpu\
+	$U/_mlfqsleep\
+	$U/_schedtest\
+	$U/_mlfqpriority\
+	$U/_mlfqstarvation\
 
 
 fs.img: mkfs/mkfs README $(UPROGS)
