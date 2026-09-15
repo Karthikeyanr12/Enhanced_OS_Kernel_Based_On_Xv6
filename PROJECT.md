@@ -58,7 +58,7 @@ Feature → Build → Test → Explain → Commit → Next Feature
 [x] Original xv6 boots
 
 [x] Enhanced process management
-[ ] MLFQ scheduler
+[x] MLFQ scheduler
 [ ] System call tracing
 [ ] Copy-on-Write
 [ ] Kernel statistics

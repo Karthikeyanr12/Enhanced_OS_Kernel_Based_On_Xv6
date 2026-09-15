@@ -11,6 +11,7 @@ struct proc_info {
   char name[16];      // Process name
   uint64 cpu_ticks;   // Accumulated CPU ticks
   uint num_sched;     // Number of times scheduled
+  int priority;       // Current MLFQ queue (0, 1, 2)
 };
 
 #endif

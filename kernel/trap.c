@@ -81,12 +81,10 @@ usertrap(void)
   if (killed(p))
     kexit(-1);
 
-  // give up the CPU if this is a timer interrupt.
+  // give up the CPU if this is a timer interrupt and quantum expired / preempted.
   if (which_dev == 2) {
-    acquire(&p->lock);
-    p->cpu_ticks++;
-    release(&p->lock);
-    yield();
+    if (p && mlfq_timer_tick(p))
+      yield();
   }
 
   prepare_return();
@@ -157,13 +155,10 @@ kerneltrap()
     panic("kerneltrap");
   }
 
-  // give up the CPU if this is a timer interrupt.
+  // give up the CPU if this is a timer interrupt and quantum expired / preempted.
   if (which_dev == 2 && myproc() != 0) {
-    struct proc *p = myproc();
-    acquire(&p->lock);
-    p->cpu_ticks++;
-    release(&p->lock);
-    yield();
+    if (mlfq_timer_tick(myproc()))
+      yield();
   }
 
   // the yield() may have caused some traps to occur,
@@ -175,11 +170,19 @@ kerneltrap()
 void
 clockintr()
 {
+  int do_boost = 0;
   if (cpuid() == 0) {
     acquire(&tickslock);
     ticks++;
+    if (ticks % MLFQ_BOOST_INTERVAL == 0) {
+      do_boost = 1;
+    }
     wakeup(&ticks);
     release(&tickslock);
+
+    if (do_boost) {
+      mlfq_boost();
+    }
   }
 
   // ask for the next timer interrupt. this also clears

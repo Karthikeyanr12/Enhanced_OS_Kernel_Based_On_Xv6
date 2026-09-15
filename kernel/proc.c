@@ -11,6 +11,8 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
+const int mlfq_slice[MLFQ_QUEUES] = { 1, 2, 4 };
+
 struct proc *initproc;
 
 int nextpid = 1;
@@ -127,6 +129,8 @@ found:
   p->state = USED;
   p->cpu_ticks = 0;
   p->num_sched = 0;
+  p->priority = MLFQ_PRIO_HIGH;
+  p->ticks_in_slice = 0;
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -172,6 +176,8 @@ freeproc(struct proc *p)
   p->xstate = 0;
   p->cpu_ticks = 0;
   p->num_sched = 0;
+  p->priority = MLFQ_PRIO_HIGH;
+  p->ticks_in_slice = 0;
   p->state = UNUSED;
 }
 
@@ -435,6 +441,7 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  static int last_rr[MLFQ_QUEUES] = { 0, 0, 0 };
 
   c->proc = 0;
   for (;;) {
@@ -447,27 +454,38 @@ scheduler(void)
     intr_off();
 
     int found = 0;
-    for (p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if (p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        p->num_sched++;
-        swtch(&c->context, &p->context);
+    // Multi-Level Feedback Queue: Search queues from highest priority (0) to lowest (2)
+    for (int q = 0; q < MLFQ_QUEUES; q++) {
+      int start = last_rr[q];
+      for (int i = 0; i < NPROC; i++) {
+        int idx = (start + i) % NPROC;
+        p = &proc[idx];
+        acquire(&p->lock);
+        if (p->state == RUNNABLE && p->priority == q) {
+          last_rr[q] = (idx + 1) % NPROC;
 
-        // Don't re-enable interrupts on release.
-        mycpu()->intena = 0;
+          // Switch to chosen process. It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          c->proc = p;
+          p->num_sched++;
+          swtch(&c->context, &p->context);
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
+          // Don't re-enable interrupts on release.
+          mycpu()->intena = 0;
+
+          // Process is done running for now.
+          c->proc = 0;
+          found = 1;
+          release(&p->lock);
+          goto next_schedule_cycle; // Always restart from Q0
+        }
+        release(&p->lock);
       }
-      release(&p->lock);
     }
+
+next_schedule_cycle:
     if (found == 0) {
       // nothing to run; stop running on this core until an interrupt.
       asm volatile("wfi");
@@ -573,6 +591,7 @@ sleep(void)
   acquire(&p->lock);
   if (p->chan != 0) {
     p->state = SLEEPING;
+    p->ticks_in_slice = 0;
     sched();
   }
   release(&p->lock);
@@ -744,6 +763,7 @@ proc_getpinfo(uint64 dst_addr, int max_procs)
       safestrcpy(info.name, p->name, sizeof(info.name));
       info.cpu_ticks = p->cpu_ticks;
       info.num_sched = p->num_sched;
+      info.priority = p->priority;
       release(&p->lock);
       release(&wait_lock);
 
@@ -759,4 +779,58 @@ proc_getpinfo(uint64 dst_addr, int max_procs)
 
   return count;
 }
+
+// Check if there is any RUNNABLE process with higher priority (strictly lower numerical value)
+int
+has_higher_priority_proc(int current_prio)
+{
+  if (current_prio <= MLFQ_PRIO_HIGH)
+    return 0;
+
+  for (struct proc *p = proc; p < &proc[NPROC]; p++) {
+    if (p->state == RUNNABLE && p->priority < current_prio)
+      return 1;
+  }
+  return 0;
+}
+
+// Periodic priority boost: reset all active processes to Queue 0
+void
+mlfq_boost(void)
+{
+  for (struct proc *p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if (p->state != UNUSED) {
+      p->priority = MLFQ_PRIO_HIGH;
+      p->ticks_in_slice = 0;
+    }
+    release(&p->lock);
+  }
+}
+
+// Called on timer interrupt for the current running process.
+// Increments cpu_ticks and ticks_in_slice.
+// Returns 1 if the process should yield, 0 if it should continue.
+int
+mlfq_timer_tick(struct proc *p)
+{
+  int should_yield = 0;
+  acquire(&p->lock);
+  p->cpu_ticks++;
+  p->ticks_in_slice++;
+
+  if (p->ticks_in_slice >= mlfq_slice[p->priority]) {
+    // Time slice exhausted: demote priority
+    if (p->priority < MLFQ_PRIO_LOW)
+      p->priority++;
+    p->ticks_in_slice = 0;
+    should_yield = 1;
+  } else if (has_higher_priority_proc(p->priority)) {
+    // Preempted by a process at higher priority
+    should_yield = 1;
+  }
+  release(&p->lock);
+  return should_yield;
+}
+
 

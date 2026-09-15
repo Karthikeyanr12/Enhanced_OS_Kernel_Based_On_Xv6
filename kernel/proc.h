@@ -78,6 +78,12 @@ struct trapframe {
 
 enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
 
+#define MLFQ_QUEUES         3
+#define MLFQ_PRIO_HIGH      0
+#define MLFQ_PRIO_MED       1
+#define MLFQ_PRIO_LOW       2
+#define MLFQ_BOOST_INTERVAL 100
+
 // Per-process state
 struct proc {
   struct spinlock lock;
@@ -103,4 +109,7 @@ struct proc {
   char name[16];               // Process name (debugging)
   uint64 cpu_ticks;            // CPU ticks consumed by this process
   uint num_sched;              // Number of times scheduled
+  int priority;                // Current MLFQ queue level (0, 1, 2)
+  int ticks_in_slice;          // Timer ticks consumed in current slice
 };
+

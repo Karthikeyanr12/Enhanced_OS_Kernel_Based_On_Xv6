@@ -13,7 +13,7 @@ main(int argc, char *argv[])
     exit(1);
   }
 
-  printf("PID    PPID   STATE        SIZE        TICKS  SCHED  NAME\n");
+  printf("PID    PPID   STATE        PRIO   SIZE        TICKS  SCHED  NAME\n");
   for (int i = 0; i < count; i++) {
     // PID
     printf("%d", procs[i].pid);
@@ -33,6 +33,13 @@ main(int argc, char *argv[])
     printf("%s", procs[i].state);
     int len = strlen(procs[i].state);
     for (int s = 0; s < 13 - len; s++) printf(" ");
+
+    // PRIO
+    printf("%d", procs[i].priority);
+    int pr = procs[i].priority;
+    spaces = 7;
+    do { spaces--; pr /= 10; } while (pr > 0);
+    for (int s = 0; s < spaces; s++) printf(" ");
 
     // SIZE
     printf("%ld", procs[i].sz);
