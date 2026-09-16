@@ -132,6 +132,12 @@ found:
   p->priority = MLFQ_PRIO_HIGH;
   p->ticks_in_slice = 0;
   p->trace_mask = 0;
+  p->ctime = ticks;
+  p->first_sched_time = 0;
+  p->etime = 0;
+  p->wait_ticks = 0;
+  p->ready_start = 0;
+  p->syscall_count = 0;
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0) {
@@ -238,6 +244,7 @@ userinit(void)
   p->cwd = namei("/");
 
   p->state = RUNNABLE;
+  p->ready_start = ticks;
 
   release(&p->lock);
 }
@@ -312,6 +319,7 @@ kfork(void)
 
   acquire(&np->lock);
   np->state = RUNNABLE;
+  np->ready_start = ticks;
   release(&np->lock);
 
   return pid;
@@ -369,6 +377,7 @@ kexit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
+  p->etime = ticks;
 
   release(&wait_lock);
 
@@ -471,6 +480,12 @@ scheduler(void)
           // before jumping back to us.
           p->state = RUNNING;
           c->proc = p;
+          if (p->num_sched == 0) {
+            p->first_sched_time = ticks;
+          }
+          if (p->ready_start > 0 && ticks >= p->ready_start) {
+            p->wait_ticks += (ticks - p->ready_start);
+          }
           p->num_sched++;
           swtch(&c->context, &p->context);
 
@@ -529,6 +544,7 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+  p->ready_start = ticks;
   sched();
   release(&p->lock);
 }
@@ -616,6 +632,7 @@ wakeup(void *chan)
       // go to sleep, also set it back to RUNNING.
       if (p->state == SLEEPING) {
         p->state = RUNNABLE;
+        p->ready_start = ticks;
       }
     }
     release(&p->lock);
@@ -637,6 +654,7 @@ kkill(int pid)
       if (p->state == SLEEPING) {
         // Wake process from sleep().
         p->state = RUNNABLE;
+        p->ready_start = ticks;
       }
       release(&p->lock);
       return 0;
@@ -766,6 +784,17 @@ proc_getpinfo(uint64 dst_addr, int max_procs)
       info.cpu_ticks = p->cpu_ticks;
       info.num_sched = p->num_sched;
       info.priority = p->priority;
+      info.ctime = p->ctime;
+      info.response_time = (p->num_sched > 0 && p->first_sched_time >= p->ctime) ? (p->first_sched_time - p->ctime) : 0;
+      info.wait_ticks = p->wait_ticks;
+      if (p->state == ZOMBIE && p->etime >= p->ctime) {
+        info.turnaround_time = p->etime - p->ctime;
+      } else if (ticks >= p->ctime) {
+        info.turnaround_time = ticks - p->ctime;
+      } else {
+        info.turnaround_time = 0;
+      }
+      info.syscall_count = p->syscall_count;
       release(&p->lock);
       release(&wait_lock);
 

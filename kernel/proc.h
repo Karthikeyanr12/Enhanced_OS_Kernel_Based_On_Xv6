@@ -112,5 +112,11 @@ struct proc {
   int priority;                // Current MLFQ queue level (0, 1, 2)
   int ticks_in_slice;          // Timer ticks consumed in current slice
   int trace_mask;              // System call tracing bitmask
+  uint ctime;                  // Creation time in ticks
+  uint first_sched_time;       // Timestamp of first CPU dispatch
+  uint etime;                  // Exit timestamp in ticks
+  uint wait_ticks;             // Accumulated ready-queue wait ticks
+  uint ready_start;            // Timestamp when process became RUNNABLE
+  uint syscall_count;          // Total system calls executed
 };
 

@@ -12,6 +12,11 @@ struct proc_info {
   uint64 cpu_ticks;   // Accumulated CPU ticks
   uint num_sched;     // Number of times scheduled
   int priority;       // Current MLFQ queue (0, 1, 2)
+  uint ctime;         // Creation time (ticks)
+  uint response_time; // Response time (ticks to first execution)
+  uint wait_ticks;    // Total ticks spent waiting in RUNNABLE state
+  uint turnaround_time; // Total ticks from creation to exit (or elapsed)
+  uint syscall_count; // Total system calls executed
 };
 
 #endif

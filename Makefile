@@ -159,6 +159,12 @@ UPROGS=\
 	$U/_mlfqstarvation\
 	$U/_trace\
 	$U/_tracetest\
+	$U/_kstats\
+	$U/_kstatstest\
+	$U/_mlfqbench_cpu\
+	$U/_mlfqbench_io\
+	$U/_mlfqbench_mix\
+	$U/_mlfqbench_comp\
 
 
 fs.img: mkfs/mkfs README $(UPROGS)
