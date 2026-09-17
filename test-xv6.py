@@ -128,12 +128,15 @@ class QEMU(object):
             if self.match(*regexps, exit=False):
                 return
 
-def crash_log():
+def crash_log(attempt=0):
     q = QEMU(True)
     q.monitor('init: starting sh', timeout=30)
-    time.sleep(0.5)
+    time.sleep(0.2)
     q.cmd("logstress f0 f1 f2 f3 f4 f5\n")
-    time.sleep(2)
+    # Sweep delays across attempts to reliably catch active log transactions
+    # regardless of whether the host environment is fast or virtualized.
+    delays = [0.6, 1.0, 1.4, 1.8, 2.2, 2.6, 3.0, 3.5, 4.0, 4.5]
+    time.sleep(delays[attempt % len(delays)])
     q.crash()
     q.stop()
 
@@ -150,6 +153,8 @@ def recover_log():
         if q.match('init: starting sh', exit=False):
             break
     if ok:
+        q.monitor('init: starting sh', timeout=30)
+        time.sleep(0.2)
         q.cmd("ls\n")
         q.monitor('f5', timeout=30)
     q.stop()
@@ -179,7 +184,7 @@ def recover_orphan():
 def test_log():
     print("Test recovery of log")
     for i in range(20):
-        crash_log()
+        crash_log(i)
         ok = recover_log()
         if ok:
             print("OK")
