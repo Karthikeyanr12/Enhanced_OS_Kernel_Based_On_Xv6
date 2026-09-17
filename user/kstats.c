@@ -16,10 +16,15 @@ print_num_col(long val, int width)
 {
   printf("%ld", val);
   long v = val;
-  if (v < 0) v = -v;
+  if (v < 0)
+    v = -v;
   int digits = 0;
-  do { digits++; v /= 10; } while (v > 0);
-  if (val < 0) digits++;
+  do {
+    digits++;
+    v /= 10;
+  } while (v > 0);
+  if (val < 0)
+    digits++;
   print_spaces(width - digits);
 }
 
@@ -32,7 +37,8 @@ main(int argc, char *argv[])
     exit(1);
   }
 
-  printf("PID    PPID   STATE        PRIO   TICKS  SCHED  RESP   WAIT   TURN   SCALL  NAME\n");
+  printf(
+    "PID    PPID   STATE        PRIO   TICKS  SCHED  RESP   WAIT   TURN   SCALL  NAME\n");
   for (int i = 0; i < count; i++) {
     // PID
     print_num_col(procs[i].pid, 7);

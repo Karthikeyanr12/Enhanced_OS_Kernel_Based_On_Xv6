@@ -10,13 +10,14 @@ main(int argc, char *argv[])
 
   // Test 1: Single Syscall Tracing (SYS_pause = 13)
   printf("\n[Test 1] Testing single syscall tracing (SYS_pause)...\n");
-  printf("Expected output below: trace message for 'pause', none for 'getpid'\n");
+  printf(
+    "Expected output below: trace message for 'pause', none for 'getpid'\n");
   if (trace(1 << SYS_pause) < 0) {
     printf("tracetest: FAIL - trace(1 << SYS_pause) returned error\n");
     exit(1);
   }
-  getpid();   // should NOT be traced
-  pause(1);   // SHOULD be traced (num=13, return=0)
+  getpid(); // should NOT be traced
+  pause(1); // SHOULD be traced (num=13, return=0)
   printf("[Test 1] PASSED.\n");
 
   // Test 2: Multiple Syscalls Tracing (SYS_open = 15, SYS_close = 21)
@@ -32,7 +33,8 @@ main(int argc, char *argv[])
   printf("[Test 2] PASSED.\n");
 
   // Test 3: Error Return Value Tracing
-  printf("\n[Test 3] Testing error return value reporting (open non-existent)...\n");
+  printf(
+    "\n[Test 3] Testing error return value reporting (open non-existent)...\n");
   printf("Expected output below: trace message for 'open' with return=-1\n");
   trace(1 << SYS_open);
   int bad_fd = open("__nonexistent_file__", 0);
@@ -67,7 +69,8 @@ main(int argc, char *argv[])
   pause(1);
   getpid();
   fd = open("README", 0);
-  if (fd >= 0) close(fd);
+  if (fd >= 0)
+    close(fd);
   printf("[Test 5] PASSED.\n");
 
   printf("\n=== ALL TRACE TESTS PASSED ===\n");

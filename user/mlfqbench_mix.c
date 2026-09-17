@@ -18,10 +18,15 @@ print_num_col(long val, int width)
 {
   printf("%ld", val);
   long v = val;
-  if (v < 0) v = -v;
+  if (v < 0)
+    v = -v;
   int digits = 0;
-  do { digits++; v /= 10; } while (v > 0);
-  if (val < 0) digits++;
+  do {
+    digits++;
+    v /= 10;
+  } while (v > 0);
+  if (val < 0)
+    digits++;
   print_spaces(width - digits);
 }
 
@@ -63,11 +68,13 @@ main(int argc, char *argv[])
     }
     if (pid == 0) {
       // Mixed: compute bursts separated by sleep and system calls
+      static volatile uint64 compute_sink;
       for (int cycle = 0; cycle < 5; cycle++) {
-        volatile uint64 s = 0;
+        uint64 s = 0;
         for (int k = 0; k < 18000000; k++) {
           s += (uint64)k * 3ULL;
         }
+        compute_sink = s;
         pause(1);
         getpid();
         uptime();
@@ -104,8 +111,12 @@ main(int argc, char *argv[])
   printf("WORKER  PID    PRIO   TICKS  SCHED  RESP   WAIT   TURN   SCALL\n");
   for (int i = 0; i < NUM_MIXED_WORKERS; i++) {
     char wname[16];
-    wname[0] = 'M'; wname[1] = 'I'; wname[2] = 'X'; wname[3] = '-';
-    wname[4] = '0' + i; wname[5] = '\0';
+    wname[0] = 'M';
+    wname[1] = 'I';
+    wname[2] = 'X';
+    wname[3] = '-';
+    wname[4] = '0' + i;
+    wname[5] = '\0';
     print_str_col(wname, 8);
     print_num_col(final_stats[i].pid, 7);
     printf("Q%d", final_stats[i].priority);
@@ -118,11 +129,11 @@ main(int argc, char *argv[])
     print_num_col(final_stats[i].syscall_count, 7);
     printf("\n");
 
-    printf("CSV: MIX,%d,%d,%ld,%d,%d,%d,%d,%d\n",
-           final_stats[i].pid, final_stats[i].priority,
-           final_stats[i].cpu_ticks, final_stats[i].num_sched,
-           final_stats[i].response_time, final_stats[i].wait_ticks,
-           final_stats[i].turnaround_time, final_stats[i].syscall_count);
+    printf("CSV: MIX,%d,%d,%ld,%d,%d,%d,%d,%d\n", final_stats[i].pid,
+           final_stats[i].priority, final_stats[i].cpu_ticks,
+           final_stats[i].num_sched, final_stats[i].response_time,
+           final_stats[i].wait_ticks, final_stats[i].turnaround_time,
+           final_stats[i].syscall_count);
   }
 
   printf("=== Benchmark 3: Completed ===\n");

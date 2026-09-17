@@ -30,10 +30,12 @@ main(int argc, char *argv[])
     exit(1);
   }
   if (cpu_pid == 0) {
-    volatile uint64 sum = 0;
+    static volatile uint64 compute_sink;
+    uint64 sum = 0;
     for (int i = 0; i < 90000000; i++) {
       sum += (uint64)i * 13ULL;
     }
+    compute_sink = sum;
     exit(0);
   }
 
@@ -46,19 +48,22 @@ main(int argc, char *argv[])
     exit(1);
   }
   if (sleep_pid == 0) {
+    static volatile uint64 compute_sink;
     for (int cycle = 0; cycle < 12; cycle++) {
       // Small compute workload
-      volatile uint64 sum = 0;
+      uint64 sum = 0;
       for (int i = 0; i < 80000; i++) {
         sum += (uint64)i;
       }
+      compute_sink = sum;
       pause(1); // sleep for 1 tick
     }
     exit(0);
   }
 
-  printf("mlfqsleep: spawned CPU-bound worker (PID %d) and Sleeping worker (PID %d)\n",
-         cpu_pid, sleep_pid);
+  printf(
+    "mlfqsleep: spawned CPU-bound worker (PID %d) and Sleeping worker (PID %d)\n",
+    cpu_pid, sleep_pid);
 
   int cpu_demoted_to_q2 = 0;
   int sleep_retained_high = 1;
@@ -74,13 +79,15 @@ main(int argc, char *argv[])
       printf("  CPU-bound  (PID %d): prio=Q%d, state=%s, ticks=%ld, sched=%d\n",
              info_cpu.pid, info_cpu.priority, info_cpu.state,
              info_cpu.cpu_ticks, info_cpu.num_sched);
-      if (info_cpu.priority >= 2) cpu_demoted_to_q2 = 1;
+      if (info_cpu.priority >= 2)
+        cpu_demoted_to_q2 = 1;
     }
     if (found_sleep) {
       printf("  Sleeping   (PID %d): prio=Q%d, state=%s, ticks=%ld, sched=%d\n",
              info_sleep.pid, info_sleep.priority, info_sleep.state,
              info_sleep.cpu_ticks, info_sleep.num_sched);
-      if (info_sleep.priority > 1) sleep_retained_high = 0;
+      if (info_sleep.priority > 1)
+        sleep_retained_high = 0;
     }
   }
 
@@ -89,15 +96,17 @@ main(int argc, char *argv[])
   wait(0);
 
   printf("mlfqsleep: verification results:\n");
-  printf("  CPU-bound demoted to Q2: %s\n", cpu_demoted_to_q2 ? "YES (PASSED)" : "NO");
-  printf("  Sleeping process retained high priority (Q0/Q1): %s\n", sleep_retained_high ? "YES (PASSED)" : "NO");
+  printf("  CPU-bound demoted to Q2: %s\n",
+         cpu_demoted_to_q2 ? "YES (PASSED)" : "NO");
+  printf("  Sleeping process retained high priority (Q0/Q1): %s\n",
+         sleep_retained_high ? "YES (PASSED)" : "NO");
 
   if (!cpu_demoted_to_q2 || !sleep_retained_high) {
-    printf("mlfqsleep: FAIL - scheduler behavior did not differentiate CPU and I/O tasks\n");
+    printf(
+      "mlfqsleep: FAIL - scheduler behavior did not differentiate CPU and I/O tasks\n");
     exit(1);
   }
 
   printf("=== MLFQ Test 3: PASSED ===\n");
   exit(0);
 }
-

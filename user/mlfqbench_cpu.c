@@ -18,10 +18,15 @@ print_num_col(long val, int width)
 {
   printf("%ld", val);
   long v = val;
-  if (v < 0) v = -v;
+  if (v < 0)
+    v = -v;
   int digits = 0;
-  do { digits++; v /= 10; } while (v > 0);
-  if (val < 0) digits++;
+  do {
+    digits++;
+    v /= 10;
+  } while (v > 0);
+  if (val < 0)
+    digits++;
   print_spaces(width - digits);
 }
 
@@ -33,13 +38,16 @@ print_str_col(const char *s, int width)
   print_spaces(width - len);
 }
 
+static volatile uint64 compute_sink;
+
 static void
 do_compute_workload(int iterations)
 {
-  volatile uint64 sum = 0;
+  uint64 sum = 0;
   for (int i = 0; i < iterations; i++) {
     sum += (uint64)i * (uint64)(i ^ 0x5a5a);
   }
+  compute_sink = sum;
 }
 
 static int
@@ -104,8 +112,12 @@ main(int argc, char *argv[])
   printf("WORKER  PID    PRIO   TICKS  SCHED  RESP   WAIT   TURN   SCALL\n");
   for (int i = 0; i < NUM_CPU_WORKERS; i++) {
     char wname[16];
-    wname[0] = 'C'; wname[1] = 'P'; wname[2] = 'U'; wname[3] = '-';
-    wname[4] = '0' + i; wname[5] = '\0';
+    wname[0] = 'C';
+    wname[1] = 'P';
+    wname[2] = 'U';
+    wname[3] = '-';
+    wname[4] = '0' + i;
+    wname[5] = '\0';
     print_str_col(wname, 8);
     print_num_col(final_stats[i].pid, 7);
     printf("Q%d", final_stats[i].priority);
@@ -118,11 +130,11 @@ main(int argc, char *argv[])
     print_num_col(final_stats[i].syscall_count, 7);
     printf("\n");
 
-    printf("CSV: CPU,%d,%d,%ld,%d,%d,%d,%d,%d\n",
-           final_stats[i].pid, final_stats[i].priority,
-           final_stats[i].cpu_ticks, final_stats[i].num_sched,
-           final_stats[i].response_time, final_stats[i].wait_ticks,
-           final_stats[i].turnaround_time, final_stats[i].syscall_count);
+    printf("CSV: CPU,%d,%d,%ld,%d,%d,%d,%d,%d\n", final_stats[i].pid,
+           final_stats[i].priority, final_stats[i].cpu_ticks,
+           final_stats[i].num_sched, final_stats[i].response_time,
+           final_stats[i].wait_ticks, final_stats[i].turnaround_time,
+           final_stats[i].syscall_count);
   }
 
   printf("=== Benchmark 1: Completed ===\n");

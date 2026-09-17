@@ -20,30 +20,35 @@ workload_primes(int limit)
         break;
       }
     }
-    if (is_prime) prime_count++;
+    if (is_prime)
+      prime_count++;
   }
 }
+
+static volatile uint64 compute_sink;
 
 // Workload 2: Fibonacci modulo sequence
 static void
 workload_fibonacci(int iterations)
 {
-  volatile uint64 a = 0, b = 1;
+  uint64 a = 0, b = 1;
   for (int i = 0; i < iterations; i++) {
     uint64 c = (a + b) % 1000000007ULL;
     a = b;
     b = c;
   }
+  compute_sink = a + b;
 }
 
 // Workload 3: Polynomial calculation
 static void
 workload_polynomial(int iterations)
 {
-  volatile uint64 sum = 0;
+  uint64 sum = 0;
   for (int i = 0; i < iterations; i++) {
     sum += (uint64)i * (uint64)i + (uint64)i * 3ULL + 7ULL;
   }
+  compute_sink = sum;
 }
 
 static void
@@ -111,4 +116,3 @@ main(int argc, char *argv[])
   printf("=== MLFQ Test 2: PASSED ===\n");
   exit(0);
 }
-

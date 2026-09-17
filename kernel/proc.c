@@ -11,7 +11,7 @@ struct cpu cpus[NCPU];
 
 struct proc proc[NPROC];
 
-const int mlfq_slice[MLFQ_QUEUES] = { 1, 2, 4 };
+const int mlfq_slice[MLFQ_QUEUES] = {1, 2, 4};
 
 struct proc *initproc;
 
@@ -452,7 +452,7 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  static int last_rr[MLFQ_QUEUES] = { 0, 0, 0 };
+  static int last_rr[MLFQ_QUEUES] = {0, 0, 0};
 
   c->proc = 0;
   for (;;) {
@@ -502,7 +502,7 @@ scheduler(void)
       }
     }
 
-next_schedule_cycle:
+  next_schedule_cycle:
     if (found == 0) {
       // nothing to run; stop running on this core until an interrupt.
       asm volatile("wfi");
@@ -785,7 +785,9 @@ proc_getpinfo(uint64 dst_addr, int max_procs)
       info.num_sched = p->num_sched;
       info.priority = p->priority;
       info.ctime = p->ctime;
-      info.response_time = (p->num_sched > 0 && p->first_sched_time >= p->ctime) ? (p->first_sched_time - p->ctime) : 0;
+      info.response_time = (p->num_sched > 0 && p->first_sched_time >= p->ctime)
+                             ? (p->first_sched_time - p->ctime)
+                             : 0;
       info.wait_ticks = p->wait_ticks;
       if (p->state == ZOMBIE && p->etime >= p->ctime) {
         info.turnaround_time = p->etime - p->ctime;
@@ -799,7 +801,8 @@ proc_getpinfo(uint64 dst_addr, int max_procs)
       release(&wait_lock);
 
       uint64 target = dst_addr + (uint64)count * sizeof(struct proc_info);
-      if (copyout(myproc()->pagetable, myproc()->sz, target, (char *)&info, sizeof(info)) < 0)
+      if (copyout(myproc()->pagetable, myproc()->sz, target, (char *)&info,
+                  sizeof(info)) < 0)
         return -1;
       count++;
     } else {
@@ -863,5 +866,3 @@ mlfq_timer_tick(struct proc *p)
   release(&p->lock);
   return should_yield;
 }
-
-

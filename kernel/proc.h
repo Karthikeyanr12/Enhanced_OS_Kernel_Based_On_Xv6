@@ -119,4 +119,3 @@ struct proc {
   uint ready_start;            // Timestamp when process became RUNNABLE
   uint syscall_count;          // Total system calls executed
 };
-

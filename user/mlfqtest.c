@@ -38,14 +38,17 @@ get_proc_sched(int pid)
   return 0;
 }
 
+static volatile uint64 compute_sink;
+
 // Deterministic compute workload: polynomial arithmetic
 static void
 do_compute_workload(int iterations)
 {
-  volatile uint64 sum = 0;
+  uint64 sum = 0;
   for (int i = 0; i < iterations; i++) {
     sum += (uint64)i * (uint64)(i ^ 0x5a5a);
   }
+  compute_sink = sum;
 }
 
 int
@@ -53,11 +56,22 @@ main(int argc, char *argv[])
 {
   printf("=== MLFQ Test 1: Basic MLFQ Scheduling Test ===\n");
 
-  // Part 1: Initial priority check
-  int my_prio = get_proc_prio(getpid());
-  printf("mlfqtest: checking initial priority: Q%d\n", my_prio);
-  if (my_prio != 0) {
-    printf("mlfqtest: FAIL - initial priority is %d, expected 0 (Q0)\n", my_prio);
+  // Part 1: Initial priority check on a freshly created process
+  int init_pid = fork();
+  if (init_pid < 0) {
+    printf("mlfqtest: fork failed\n");
+    exit(1);
+  }
+  if (init_pid == 0) {
+    int p = get_proc_prio(getpid());
+    exit(p);
+  }
+  int child_prio = -1;
+  wait(&child_prio);
+  printf("mlfqtest: checking initial priority: Q%d\n", child_prio);
+  if (child_prio != 0) {
+    printf("mlfqtest: FAIL - initial priority is %d, expected 0 (Q0)\n",
+           child_prio);
     exit(1);
   }
   printf("mlfqtest: PASS - initial priority is Q0\n");
@@ -83,8 +97,9 @@ main(int argc, char *argv[])
   pause(5);
   printf("mlfqtest: sampling active worker statistics:\n");
   for (int i = 0; i < 3; i++) {
-    printf("  Worker %d (PID %d): prio=Q%d, ticks=%ld, sched=%d\n",
-           i, pids[i], get_proc_prio(pids[i]), get_proc_ticks(pids[i]), get_proc_sched(pids[i]));
+    printf("  Worker %d (PID %d): prio=Q%d, ticks=%ld, sched=%d\n", i, pids[i],
+           get_proc_prio(pids[i]), get_proc_ticks(pids[i]),
+           get_proc_sched(pids[i]));
   }
 
   // Wait for all 3 workers
@@ -101,7 +116,7 @@ main(int argc, char *argv[])
     exit(1);
   }
   if (cpid == 0) {
-    do_compute_workload(120000000);
+    do_compute_workload(250000000);
     exit(0);
   }
 
@@ -110,13 +125,17 @@ main(int argc, char *argv[])
   for (int s = 0; s < 25; s++) {
     pause(1);
     int p = get_proc_prio(cpid);
-    if (p == 1) reached_q1 = 1;
-    if (p == 2) reached_q2 = 1;
-    if (reached_q2) break;
+    if (p == 1)
+      reached_q1 = 1;
+    if (p == 2)
+      reached_q2 = 1;
+    if (reached_q2)
+      break;
   }
   wait(0);
 
-  printf("mlfqtest: demotion results: reached Q1=%d, reached Q2=%d\n", reached_q1, reached_q2);
+  printf("mlfqtest: demotion results: reached Q1=%d, reached Q2=%d\n",
+         reached_q1, reached_q2);
   if (!reached_q2) {
     printf("mlfqtest: FAIL - compute process did not demote to Q2\n");
     exit(1);

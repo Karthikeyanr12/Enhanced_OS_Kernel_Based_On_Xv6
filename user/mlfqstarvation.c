@@ -22,14 +22,16 @@ int
 main(int argc, char *argv[])
 {
   printf("=== MLFQ Test 6: Starvation Prevention / Priority Boost Test ===\n");
-  printf("mlfqstarvation: verifying periodic priority boost (interval = 100 ticks)\n");
+  printf(
+    "mlfqstarvation: verifying periodic priority boost (interval = 100 ticks)\n");
 
   int t_start = uptime();
   int next_boost = ((t_start / 100) + 1) * 100;
   int ticks_to_boost = next_boost - t_start;
 
-  printf("mlfqstarvation: current uptime = %d ticks. Next boost at tick %d (~%d ticks remaining)\n",
-         t_start, next_boost, ticks_to_boost);
+  printf(
+    "mlfqstarvation: current uptime = %d ticks. Next boost at tick %d (~%d ticks remaining)\n",
+    t_start, next_boost, ticks_to_boost);
 
   int cpid = fork();
   if (cpid < 0) {
@@ -39,10 +41,12 @@ main(int argc, char *argv[])
 
   if (cpid == 0) {
     // Child: compute loop to cross the boost boundary
-    volatile uint64 sum = 0;
+    static volatile uint64 compute_sink;
+    uint64 sum = 0;
     for (int i = 0; i < 350000000; i++) {
       sum += (uint64)i * 19ULL;
     }
+    compute_sink = sum;
     exit(0);
   }
 
@@ -50,7 +54,8 @@ main(int argc, char *argv[])
   int reached_q2 = 0;
   int boost_detected = 0;
   int max_samples = (ticks_to_boost / 3) + 10;
-  if (max_samples < 15) max_samples = 15;
+  if (max_samples < 15)
+    max_samples = 15;
 
   printf("mlfqstarvation: monitoring Child PID %d priority...\n", cpid);
   for (int s = 0; s < max_samples; s++) {
@@ -59,7 +64,8 @@ main(int argc, char *argv[])
     struct proc_info info;
     if (get_proc(cpid, &info)) {
       printf("  Tick %d: Child PID %d prio=Q%d ticks=%ld sched=%d state=%s\n",
-             now, info.pid, info.priority, info.cpu_ticks, info.num_sched, info.state);
+             now, info.pid, info.priority, info.cpu_ticks, info.num_sched,
+             info.state);
 
       if (info.priority == 2) {
         reached_q2 = 1;
@@ -70,8 +76,9 @@ main(int argc, char *argv[])
       if (reached_q2 && now >= next_boost) {
         if (info.priority < 2) {
           boost_detected = 1;
-          printf("mlfqstarvation: Priority boost detected! Child priority raised from Q2 -> Q%d at tick %d\n",
-                 info.priority, now);
+          printf(
+            "mlfqstarvation: Priority boost detected! Child priority raised from Q2 -> Q%d at tick %d\n",
+            info.priority, now);
           break;
         }
       }
@@ -84,16 +91,19 @@ main(int argc, char *argv[])
   wait(0);
 
   printf("\nmlfqstarvation: Starvation prevention assessment:\n");
-  printf("  1. Child successfully demoted to Q2: %s\n", reached_q2 ? "YES (PASS)" : "NO (FAIL)");
-  printf("  2. Priority boost reset Q2 -> Q0/Q1:  %s\n", boost_detected ? "YES (PASS)" : "NO (FAIL)");
+  printf("  1. Child successfully demoted to Q2: %s\n",
+         reached_q2 ? "YES (PASS)" : "NO (FAIL)");
+  printf("  2. Priority boost reset Q2 -> Q0/Q1:  %s\n",
+         boost_detected ? "YES (PASS)" : "NO (FAIL)");
 
   if (reached_q2 && boost_detected) {
-    printf("mlfqstarvation: PASS - Starvation prevention mechanism confirmed working.\n");
+    printf(
+      "mlfqstarvation: PASS - Starvation prevention mechanism confirmed working.\n");
     printf("=== MLFQ Test 6: PASSED ===\n");
     exit(0);
   } else {
-    printf("mlfqstarvation: FAIL - Starvation prevention boost was not detected.\n");
+    printf(
+      "mlfqstarvation: FAIL - Starvation prevention boost was not detected.\n");
     exit(1);
   }
 }
-

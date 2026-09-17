@@ -57,7 +57,8 @@ main(int argc, char *argv[])
   printf("PASS (recorded %d syscalls)\n", diff);
 
   // Test 3: Response Time and Lifecycle Metrics
-  printf("[Test 3] Verifying response_time, wait_ticks, and turnaround_time... ");
+  printf(
+    "[Test 3] Verifying response_time, wait_ticks, and turnaround_time... ");
   int cpid = fork();
   if (cpid < 0) {
     printf("FAIL - fork failed\n");
@@ -66,10 +67,12 @@ main(int argc, char *argv[])
 
   if (cpid == 0) {
     // Child: do compute work then exit
-    volatile uint64 sum = 0;
+    static volatile uint64 compute_sink;
+    uint64 sum = 0;
     for (int i = 0; i < 40000000; i++) {
       sum += (uint64)i * 7ULL;
     }
+    compute_sink = sum;
     exit(0);
   }
 
@@ -87,9 +90,11 @@ main(int argc, char *argv[])
   }
 
   printf("PASS\n");
-  printf("  Child Metrics: PID=%d, PRIO=Q%d, CPU_TICKS=%ld, SCHED=%d, RESP=%d, WAIT=%d, TURN=%d, SCALL=%d\n",
-         cinfo.pid, cinfo.priority, cinfo.cpu_ticks, cinfo.num_sched,
-         cinfo.response_time, cinfo.wait_ticks, cinfo.turnaround_time, cinfo.syscall_count);
+  printf(
+    "  Child Metrics: PID=%d, PRIO=Q%d, CPU_TICKS=%ld, SCHED=%d, RESP=%d, WAIT=%d, TURN=%d, SCALL=%d\n",
+    cinfo.pid, cinfo.priority, cinfo.cpu_ticks, cinfo.num_sched,
+    cinfo.response_time, cinfo.wait_ticks, cinfo.turnaround_time,
+    cinfo.syscall_count);
 
   if (cinfo.num_sched == 0) {
     printf("FAIL - child num_sched is 0\n");

@@ -181,9 +181,11 @@ syscall(void)
     p->trapframe->a0 = syscalls[num]();
 
     if ((p->trace_mask & (1 << num)) != 0) {
-      const char *name = (num < NELEM(syscall_names) && syscall_names[num]) ? syscall_names[num] : "unknown";
-      printk("trace: pid=%d name=%s syscall=%s num=%d return=%ld\n",
-             p->pid, p->name, name, num, p->trapframe->a0);
+      const char *name = (num < NELEM(syscall_names) && syscall_names[num])
+                           ? syscall_names[num]
+                           : "unknown";
+      printk("trace: pid=%d name=%s syscall=%s num=%d return=%ld\n", p->pid,
+             p->name, name, num, p->trapframe->a0);
     }
   } else {
     printk("%d %s: unknown sys call %d\n", p->pid, p->name, num);
